@@ -55,10 +55,14 @@ Yes, DoS attacks are possible.  Please be nice while Sandstorm is still in alpha
 func handleCommand(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-type", "text/plain")
 	cmd := exec.Command("/bin/sh", "-c", r.FormValue("cmd"))
-	out := &limitWriter{w, 1024 * 1024} // 1 MiB
+	// limit to 10 KiB of output
+	out := &limitWriter{w, 10 * 1024, func() {
+		fmt.Fprint(w, "\n...output truncated")
+		cmd.Process.Kill()
+	}}
 	cmd.Stdout = out
 	cmd.Stderr = out
-	if err := runWithTimeout(cmd, 10*time.Second); err != nil {
+	if err := runWithTimeout(cmd, 1*time.Second); err != nil {
 		fmt.Fprintf(w, "\n%s", err)
 	}
 }
@@ -82,6 +86,7 @@ func runWithTimeout(cmd *exec.Cmd, d time.Duration) error {
 type limitWriter struct {
 	w io.Writer // underlying writer
 	n int       // number of bytes remaining
+	f func()    // optional function to call when output is truncated
 }
 
 func (w *limitWriter) Write(p []byte) (n int, err error) {
@@ -93,8 +98,8 @@ func (w *limitWriter) Write(p []byte) (n int, err error) {
 	if len(p) > 0 {
 		n, err = w.w.Write(p)
 		w.n -= n
-		if w.n == 0 {
-			w.w.Write([]byte("\n...output truncated"))
+		if w.n == 0 && w.f != nil {
+			w.f()
 		}
 	}
 	if trunc && err != nil {
