@@ -3,6 +3,6 @@ This is a sandstorm[1] grain that contains busybox and a tiny web interface to /
 To build:
 
 $ spk keygen secret.key
-$ docker build -t sandstorm-shell . && time docker run -privileged -t -i -v `pwd`/output:/output sandstorm-shell
+$ docker build -t sandstorm-shell . && docker run -privileged -v `pwd`/output:/output sandstorm-shell
 
 [1]: http://github.com/kentonv/sandstorm
